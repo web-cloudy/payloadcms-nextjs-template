@@ -1,8 +1,6 @@
-node_modules
-.next
-out
 build
 dist
-media/*
-yarn-error.log
-tsconfig.tsbuildinfo
+/media
+node_modules
+.DS_Store
+.env
