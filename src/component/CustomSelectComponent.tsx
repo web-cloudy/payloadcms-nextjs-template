@@ -14,16 +14,16 @@ type Region = {
 
 export const CustomSelectComponent: React.FC<Props> = ({ path }) => {
     const { value, setValue } = useField<Region>({ path });
-    const [authToken, setAuthToken] = useState();
+    const [authToken, setAuthToken] = useState<string | null>(null);
     const [countries, setCountries] = useState([]);
     const [states, setStates] = useState([]);
     const [cities, setCities] = useState([]);
-    const [selectedCountries, setSelectedCountries] = useState([]);
-    const [selectedStates, setSelectedStates] = useState([]);
-    const [selectedCities, setSelectedCities] = useState([]);
+    const [selectedCountries, setSelectedCountries] = useState<string[]>(value?.countries || []);
+    const [selectedStates, setSelectedStates] = useState<string[]>(value?.states || []);
+    const [selectedCities, setSelectedCities] = useState<string[]>(value?.cities || []);
 
     useEffect(() => {
-        // Fetch countries on component mount
+        // Fetch token on component mount
         axios.get('https://www.universal-tutorial.com/api/getaccesstoken', {
             headers: {
                 "Accept": "application/json",
@@ -31,48 +31,49 @@ export const CustomSelectComponent: React.FC<Props> = ({ path }) => {
                 "user-email": "nativedev124@gmail.com"
             }
         }).then(response => {
-            const auth_token = response.data.auth_token;
-            setAuthToken(auth_token);
-            axios.get('https://www.universal-tutorial.com/api/countries/', {
-                headers: { "Authorization": `Bearer ${auth_token}` }
-            }).then(response => {
-                const respCountries = response.data.map((country) => {
-                    return {
-                        label: country.country_name,
-                        value: country.country_name,
-                    };
-                })
-                setCountries(respCountries.sort(
-                    (a, b) => a.label.localeCompare(b.label)
-                ))
-            });
+            setAuthToken(response.data.auth_token);
+        }).catch(error => {
+            console.error("Error fetching auth token:", error);
         });
     }, []);
     
     useEffect(() => {
-        setValue(
-            { countries: selectedCountries, states: [], cities: [] }
-        );
+        if (authToken) {
+            // Fetch countries when the auth token is available
+            axios.get('https://www.universal-tutorial.com/api/countries/', {
+                headers: { "Authorization": `Bearer ${authToken}` }
+            }).then(response => {
+                const respCountries = response.data.map((country) => ({
+                    label: country.country_name,
+                    value: country.country_name,
+                }));
+                setCountries(respCountries.sort((a, b) => a.label.localeCompare(b.label)));
+            }).catch(error => {
+                console.error("Error fetching countries:", error);
+            });
+        }
+    }, [authToken]);
+
+    useEffect(() => {
+        setValue({ countries: selectedCountries, states: [], cities: [] });
     }, [selectedCountries]);
 
     useEffect(() => {
-        setValue(
-            { ...value, states: selectedStates, cities: [] }
-        );
+        setValue({ ...value, states: selectedStates, cities: [] });
     }, [selectedStates]);
 
     useEffect(() => {
-        setValue(
-            { ...value, cities: selectedCities }
-        );
+        setValue({ ...value, cities: selectedCities });
     }, [selectedCities]);
 
+    
+
     useEffect(() => {
-        if (value && value.countries) {
+        if (selectedCountries.length > 0 && authToken) {
             const fetchStates = async () => {
                 try {
                     const statesArray: { label: string, value: string }[] = [];
-                    for (const country of value.countries) {
+                    for (const country of selectedCountries) {
                         const stateResponse = await axios.get(`https://www.universal-tutorial.com/api/states/${country}`, {
                             headers: { "Authorization": `Bearer ${authToken}` }
                         });
@@ -90,14 +91,14 @@ export const CustomSelectComponent: React.FC<Props> = ({ path }) => {
 
             fetchStates();
         }
-    }, [value?.countries]);
+    }, [selectedCountries, authToken]);
 
     useEffect(() => {
-        if (value && value.states) {
+        if (selectedStates.length > 0 && authToken) {
             const fetchCities = async () => {
                 try {
                     const citiesArray: { label: string, value: string }[] = [];
-                    for (const state of value.states) {
+                    for (const state of selectedStates) {
                         const cityResponse = await axios.get(`https://www.universal-tutorial.com/api/cities/${state}`, {
                             headers: { "Authorization": `Bearer ${authToken}` }
                         });
@@ -115,7 +116,7 @@ export const CustomSelectComponent: React.FC<Props> = ({ path }) => {
 
             fetchCities();
         }
-    }, [value?.states]);
+    }, [selectedStates, authToken]);
 
     return (
         <div>
