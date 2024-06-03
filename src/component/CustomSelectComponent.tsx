@@ -7,9 +7,9 @@ type Props = {
 }
 
 type Region = {
-    country: string,
-    state: string,
-    city: string
+    countries: string[],
+    states: string[],
+    cities: string[],
 }
 
 export const CustomSelectComponent: React.FC<Props> = ({ path }) => {
@@ -18,8 +18,9 @@ export const CustomSelectComponent: React.FC<Props> = ({ path }) => {
     const [countries, setCountries] = useState([]);
     const [states, setStates] = useState([]);
     const [cities, setCities] = useState([]);
-    const [selectedCountry, setSelectedCountry] = useState('');
-    const [selectedState, setSelectedState] = useState('');
+    const [selectedCountries, setSelectedCountries] = useState([]);
+    const [selectedStates, setSelectedStates] = useState([]);
+    const [selectedCities, setSelectedCities] = useState([]);
 
     useEffect(() => {
         // Fetch countries on component mount
@@ -35,64 +36,86 @@ export const CustomSelectComponent: React.FC<Props> = ({ path }) => {
             axios.get('https://www.universal-tutorial.com/api/countries/', {
                 headers: { "Authorization": `Bearer ${auth_token}` }
             }).then(response => {
-                const countries = response.data.map((country) => {
+                const respCountries = response.data.map((country) => {
                     return {
                         label: country.country_name,
                         value: country.country_name,
                     };
                 })
-
-                setCountries(countries.sort(
+                setCountries(respCountries.sort(
                     (a, b) => a.label.localeCompare(b.label)
                 ))
             });
         });
     }, []);
+    
+    useEffect(() => {
+        setValue(
+            { countries: selectedCountries, states: [], cities: [] }
+        );
+    }, [selectedCountries]);
 
     useEffect(() => {
-        if (value && value.country) {
-            // Fetch states when a country is selected
-            axios.get(`https://www.universal-tutorial.com/api/states/${value.country}`, {
-                headers: { "Authorization": `Bearer ${authToken}` }
-            }).then(response => {
-                const states = response.data.map((state) => {
-                    return {
-                        label: state.state_name,
-                        value: state.state_name,
-                    };
-                })
-
-                setStates(states.sort(
-                    (a, b) => a.label.localeCompare(b.label)
-                ))
-            }
-            );
-        }
-
-    }, [value?.country]);
+        setValue(
+            { ...value, states: selectedStates, cities: [] }
+        );
+    }, [selectedStates]);
 
     useEffect(() => {
-        if (value && value.state) {
-            // Fetch cities when a state is selected
-            axios.get(`https://www.universal-tutorial.com/api/cities/${value.state}`, {
-                headers: { "Authorization": `Bearer ${authToken}` }
-            }).then(response => {
-                const cities = response.data.map((city) => {
-                    return {
-                        label: city.city_name,
-                        value: city.city_name,
-                    };
-                })
-                console.log(cities)
+        setValue(
+            { ...value, cities: selectedCities }
+        );
+    }, [selectedCities]);
 
-                setCities(cities.sort(
-                    (a, b) => a.label.localeCompare(b.label)
-                ))
-            }
-            );
+    useEffect(() => {
+        if (value && value.countries) {
+            const fetchStates = async () => {
+                try {
+                    const statesArray: { label: string, value: string }[] = [];
+                    for (const country of value.countries) {
+                        const stateResponse = await axios.get(`https://www.universal-tutorial.com/api/states/${country}`, {
+                            headers: { "Authorization": `Bearer ${authToken}` }
+                        });
+                        const respStates = stateResponse.data.map((state) => ({
+                            label: state.state_name,
+                            value: state.state_name,
+                        }));
+                        statesArray.push(...respStates);
+                    }
+                    setStates(statesArray.sort((a, b) => a.label.localeCompare(b.label)));
+                } catch (error) {
+                    console.error("Error fetching states:", error);
+                }
+            };
+
+            fetchStates();
         }
+    }, [value?.countries]);
 
-    }, [value?.state]);
+    useEffect(() => {
+        if (value && value.states) {
+            const fetchCities = async () => {
+                try {
+                    const citiesArray: { label: string, value: string }[] = [];
+                    for (const state of value.states) {
+                        const cityResponse = await axios.get(`https://www.universal-tutorial.com/api/cities/${state}`, {
+                            headers: { "Authorization": `Bearer ${authToken}` }
+                        });
+                        const respCities = cityResponse.data.map((city) => ({
+                            label: city.city_name,
+                            value: city.city_name,
+                        }));
+                        citiesArray.push(...respCities);
+                    }
+                    setCities(citiesArray.sort((a, b) => a.label.localeCompare(b.label)));
+                } catch (error) {
+                    console.error("Error fetching cities:", error);
+                }
+            };
+
+            fetchCities();
+        }
+    }, [value?.states]);
 
     return (
         <div>
@@ -104,13 +127,15 @@ export const CustomSelectComponent: React.FC<Props> = ({ path }) => {
                 path={path}
                 name={path}
                 options={countries}
-                value={value?.country}
-                onChange={(e) => setValue(
-                    { country: e.value, state: null, city: null }
-                )}
+                value={value?.countries}
+                hasMany
+                onChange={(country) => {
+                    let countryArray = Array.isArray(country) ? country : [country];
+                    setSelectedCountries(countryArray.map(c => c.value));
+                }}
             />
             {
-                value?.country && (
+                value?.countries && value?.countries.length > 0 && (
                     <div>
                         <label className='field-label'>
                             Custom Select - States
@@ -119,17 +144,19 @@ export const CustomSelectComponent: React.FC<Props> = ({ path }) => {
                             style={{ marginBottom: '20px' }}
                             path={path}
                             name={path}
+                            hasMany
                             options={states}
-                            value={value?.state}
-                            onChange={(e) => setValue(
-                                { ...value, state: e.value, city: null }
-                            )}
+                            value={value?.states}
+                            onChange={(state) => {
+                                let stateArray = Array.isArray(state) ? state : [state];
+                                setSelectedStates(stateArray.map(s => s.value));
+                            }}
                         />
                     </div>
                 )
             }
             {
-                value?.country && value?.state && (
+                value?.countries && value?.countries?.length > 0 && value?.states && value?.states?.length > 0 && (
                     <div>
                         <label className='field-label'>
                             Custom Select - Cities
@@ -138,10 +165,12 @@ export const CustomSelectComponent: React.FC<Props> = ({ path }) => {
                             path={path}
                             name={path}
                             options={cities}
-                            value={value?.city}
-                            onChange={(e) => setValue(
-                                { ...value, city: e.value }
-                            )}
+                            value={value?.cities}
+                            hasMany
+                            onChange={(city) => {
+                                let cityArray = Array.isArray(city) ? city : [city];
+                                setSelectedCities(cityArray.map(e => e.value));
+                            }}
                         />
                     </div>
                 )
